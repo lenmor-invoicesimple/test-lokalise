@@ -2,15 +2,15 @@ name: Lokalise Sync
 
 on:
   workflow_dispatch:  # Keep manual trigger
-  push:
-    branches:
-      - main  # Trigger on push to main branch
-  pull_request:
-    types: [closed]
-    branches:
-      - main  # Trigger when PR is merged to main
-  schedule:
-    - cron: "0 2 * * *" # every night
+  # push:
+  #   branches:
+  #     - main  # Trigger on push to main branch
+  # pull_request:
+  #   types: [closed]
+  #   branches:
+  #     - main  # Trigger when PR is merged to main
+  # schedule:
+  #   - cron: "0 2 * * *" # every night
 
 jobs:
   sync-translations:

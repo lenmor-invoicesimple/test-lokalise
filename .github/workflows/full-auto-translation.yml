@@ -8,9 +8,9 @@ on:
         required: true
         default: 'es,fr'
       wait_time:
-        description: 'Minutes to wait for translation (default: 3)'
+        description: 'Minutes to wait for translation (default: 5)'
         required: false
-        default: '3'
+        default: '5'
 
 jobs:
   translate-and-pull:
@@ -100,7 +100,7 @@ jobs:
           for lang in "${LANGS[@]}"; do
             echo "Checking $lang translations:"
             
-            # Count total vs translated
+            # Count total vs translated (including fuzzy)
             total=$(curl -s -X GET \
               "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&limit=1000" \
               -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
@@ -111,15 +111,39 @@ jobs:
               -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
               jq -r '.translations | length')
             
-            echo "$lang: $translated/$total translations completed"
-            
-            # Show some examples
-            echo "Sample translations:"
-            curl -s -X GET \
-              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&filter_is_fuzzy=false&limit=3" \
+            # Also count fuzzy translations (auto-translated)
+            fuzzy=$(curl -s -X GET \
+              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&filter_is_fuzzy=true&limit=1000" \
               -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
-              jq -r '.translations[]? | "- \(.translation)"'
+              jq -r '.translations | length')
+            
+            echo "$lang: $translated non-fuzzy + $fuzzy fuzzy = $total total translations"
+            
+            # Show some examples (including fuzzy)
+            echo "Sample translations (including auto-translated):"
+            curl -s -X GET \
+              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&limit=3" \
+              -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+              jq -r '.translations[]? | "- \(.translation) (fuzzy: \(.is_fuzzy))"'
           done
+
+      - name: Step 4.5 - Debug file structure before pull
+        run: |
+          echo "=== Current file structure ==="
+          ls -la src/locales/ || echo "src/locales directory doesn't exist"
+          echo ""
+          echo "=== Testing Lokalise CLI download manually ==="
+          curl -sSL https://raw.githubusercontent.com/lokalise/lokalise-cli-2-go/master/install.sh | sh
+          ./lokalise2 file download \
+            --token ${{ secrets.LOKALISE_API_TOKEN }} \
+            --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
+            --format json \
+            --unzip-to ./test-download \
+            --include-description=false \
+            --export-empty-as skip
+          
+          echo "=== Downloaded files ==="
+          find ./test-download -name "*.json" -exec echo "File: {}" \; -exec head -3 {} \;
 
       - name: Step 5 - Pull translations back to GitHub
         uses: lokalise/lokalise-pull-action@v3.9.0
@@ -132,7 +156,8 @@ jobs:
           flat_naming: true
           skip_include_tags: true
           always_pull_base: false
-          additional_params: "--indentation=4sp"
+          # Include fuzzy (auto-translated) content
+          additional_params: "--indentation=4sp --export-empty-as skip"
 
       - name: Step 6 - Summary
         run: |
