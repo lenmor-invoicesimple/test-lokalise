@@ -22,7 +22,7 @@ jobs:
     
     env:
       TARGET_LANGUAGES: "es,fr"  # Spanish and French
-      WAIT_TIME_MINUTES: "1"     # 2 minutes wait time
+      WAIT_TIME_SECONDS: "30"     # 30 seconds wait time
     
     steps:
       - name: Checkout Repository
@@ -108,30 +108,30 @@ jobs:
       #       echo "Response for $lang: $response"
       #     done
 
-      - name: Step 2 - Trigger automation via file upload settings
-        run: |
-          echo "=== Ensuring automation triggers ==="
+      # - name: Step 2 - Trigger automation via file upload settings
+      #   run: |
+      #     echo "=== Ensuring automation triggers ==="
           
-          # The file upload in Step 0 should have triggered automation automatically
-          # with the --use-automations flag (enabled by default)
+      #     # The file upload in Step 0 should have triggered automation automatically
+      #     # with the --use-automations flag (enabled by default)
           
-          # Let's verify automation rules are properly configured
-          echo "Checking if automation rules exist..."
+      #     # Let's verify automation rules are properly configured
+      #     echo "Checking if automation rules exist..."
           
-          # Get project automations (if API supports it)
-          automations=$(curl -s -X GET \
-            "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}" \
-            -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
-            jq -r '.project.name // "Unknown project"')
+      #     # Get project automations (if API supports it)
+      #     automations=$(curl -s -X GET \
+      #       "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}" \
+      #       -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+      #       jq -r '.project.name // "Unknown project"')
           
-          echo "Project: $automations"
-          echo "✅ File upload with --use-automations should have triggered translation"
-          echo "✅ Waiting for Lokalise automation to process uploaded keys..."
+      #     echo "Project: $automations"
+      #     echo "✅ File upload with --use-automations should have triggered translation"
+      #     echo "✅ Waiting for Lokalise automation to process uploaded keys..."
 
       - name: Step 3 - Wait for Lokalise automation to complete
         run: |
-          echo "=== Waiting $WAIT_TIME_MINUTES minutes for Lokalise automation ==="
-          sleep $((WAIT_TIME_MINUTES * 60))
+          echo "=== Waiting $WAIT_TIME_SECONDS seconds for Lokalise automation ==="
+          sleep $((WAIT_TIME_SECONDS))
 
       - name: Step 4 - Verify translations were created
         run: |
