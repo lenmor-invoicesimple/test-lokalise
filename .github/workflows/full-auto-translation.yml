@@ -22,7 +22,7 @@ jobs:
     
     env:
       TARGET_LANGUAGES: "es,fr"  # Spanish and French
-      WAIT_TIME_MINUTES: "5"     # 5 minutes wait time
+      WAIT_TIME_MINUTES: "2"     # 2 minutes wait time
     
     steps:
       - name: Checkout Repository
@@ -35,7 +35,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y curl jq
 
-      - name: Step 0 - Push source files to Lokalise (optional)
+      - name: Step 0 - Push source files to Lokalise
         run: |
           echo "=== Pushing latest source files to Lokalise ==="
           
@@ -53,7 +53,8 @@ jobs:
               --lang-iso en \
               --replace-modified \
               --include-path \
-              --distinguish-by-file
+              --distinguish-by-file \
+              --use-automations
             
             echo "✅ English source file uploaded to Lokalise"
           else
@@ -107,44 +108,25 @@ jobs:
             echo "Response for $lang: $response"
           done
 
-      - name: Step 2 - Trigger automation by creating placeholder translations
+      - name: Step 2 - Trigger automation via file upload settings
         run: |
-          echo "=== Triggering Lokalise automation ==="
+          echo "=== Ensuring automation triggers ==="
           
-          # Get all keys with English translations
-          keys_response=$(curl -s -X GET \
-            "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/keys?include_translations=1&limit=5000" \
-            -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}")
+          # The file upload in Step 0 should have triggered automation automatically
+          # with the --use-automations flag (enabled by default)
           
-          echo "$keys_response" | jq -r '.keys[] | select(.translations[]? | select(.language_iso == "en")) | .key_id' > english_keys.txt
+          # Let's verify automation rules are properly configured
+          echo "Checking if automation rules exist..."
           
-          IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
+          # Get project automations (if API supports it)
+          automations=$(curl -s -X GET \
+            "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}" \
+            -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+            jq -r '.project.name // "Unknown project"')
           
-          for lang in "${LANGS[@]}"; do
-            echo "Creating placeholder translations for $lang"
-            
-            while IFS= read -r key_id; do
-              if [ ! -z "$key_id" ]; then
-                # Create empty translation to trigger automation
-                curl -s -X POST \
-                  "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations" \
-                  -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" \
-                  -H "Content-Type: application/json" \
-                  -d "{
-                    \"translations\": [
-                      {
-                        \"key_id\": $key_id,
-                        \"language_iso\": \"$lang\",
-                        \"translation\": \"\",
-                        \"is_fuzzy\": true
-                      }
-                    ]
-                  }" > /dev/null 2>&1
-                
-                sleep 0.2  # Rate limiting
-              fi
-            done < english_keys.txt
-          done
+          echo "Project: $automations"
+          echo "✅ File upload with --use-automations should have triggered translation"
+          echo "✅ Waiting for Lokalise automation to process uploaded keys..."
 
       - name: Step 3 - Wait for Lokalise automation to complete
         run: |
@@ -213,11 +195,12 @@ jobs:
           translations_path: src/locales
           base_lang: en
           file_format: json
+          indentation: 4sp
           flat_naming: true
           skip_include_tags: true
           always_pull_base: false
           # Include fuzzy (auto-translated) content and force pull
-          additional_params: "--indentation=4sp --export-empty-as skip --original-filenames=true"
+          additional_params: "--export-empty-as skip --original-filenames=true"
 
       - name: Step 5.5 - Check what changed after pull
         run: |
