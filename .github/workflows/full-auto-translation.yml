@@ -182,7 +182,8 @@ jobs:
             --format json \
             --unzip-to ./test-download \
             --include-description=false \
-            --export-empty-as skip
+            --export-empty-as=skip \
+            --indentation=4sp
           
           echo "=== Downloaded files ==="
           find ./test-download -name "*.json" -exec echo "File: {}" \; -exec head -3 {} \;
@@ -195,12 +196,10 @@ jobs:
           translations_path: src/locales
           base_lang: en
           file_format: json
-          indentation: 4sp
           flat_naming: true
           skip_include_tags: true
           always_pull_base: false
-          # Include fuzzy (auto-translated) content and force pull
-          additional_params: "--export-empty-as skip --original-filenames=true"
+          additional_params: '{"indentation": "4sp", "export_empty_as": "skip", "original_filenames": true}'
 
       - name: Step 5.5 - Check what changed after pull
         run: |
