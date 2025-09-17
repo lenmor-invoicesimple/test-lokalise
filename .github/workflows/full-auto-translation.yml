@@ -88,25 +88,25 @@ jobs:
             fi
           fi
 
-      - name: Step 1 - Ensure target languages exist
-        run: |
-          echo "=== Adding target languages to project ==="
-          echo "Target languages: $TARGET_LANGUAGES"
+      # - name: Step 1 - Ensure target languages exist
+      #   run: |
+      #     echo "=== Adding target languages to project ==="
+      #     echo "Target languages: $TARGET_LANGUAGES"
           
-          IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
+      #     IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
           
-          for lang in "${LANGS[@]}"; do
-            echo "Checking/adding language: $lang"
+      #     for lang in "${LANGS[@]}"; do
+      #       echo "Checking/adding language: $lang"
             
-            # Add language (will ignore if it already exists)
-            response=$(curl -s -X POST \
-              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/languages" \
-              -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" \
-              -H "Content-Type: application/json" \
-              -d "{\"languages\": [{\"lang_iso\": \"$lang\"}]}")
+      #       # Add language (will ignore if it already exists)
+      #       response=$(curl -s -X POST \
+      #         "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/languages" \
+      #         -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" \
+      #         -H "Content-Type: application/json" \
+      #         -d "{\"languages\": [{\"lang_iso\": \"$lang\"}]}")
             
-            echo "Response for $lang: $response"
-          done
+      #       echo "Response for $lang: $response"
+      #     done
 
       - name: Step 2 - Trigger automation via file upload settings
         run: |
@@ -161,12 +161,24 @@ jobs:
             
             echo "$lang: $translated non-fuzzy + $fuzzy fuzzy = $total total translations"
             
-            # Show some examples (including fuzzy)
-            echo "Sample translations (including auto-translated):"
+            # Show most recent translations (sorted by modification date)
+            echo "Most recent translations for $lang:"
             curl -s -X GET \
-              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&limit=3" \
+              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&limit=5" \
               -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
-              jq -r '.translations[]? | "- \(.translation) (fuzzy: \(.is_fuzzy))"'
+              jq -r '.translations | sort_by(.modified_at) | reverse | .[:5][] | "- Key: \(.key.key_name.other) | Text: \(.translation) | Modified: \(.modified_at) | Fuzzy: \(.is_fuzzy)"'
+            
+            echo ""
+            
+            # Show specifically auto-translated (fuzzy) items from today
+            echo "Recent auto-translations (fuzzy) for $lang:"
+            today=$(date -u +"%Y-%m-%d")
+            curl -s -X GET \
+              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/translations?filter_lang_iso=$lang&filter_is_fuzzy=true&limit=10" \
+              -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+              jq -r --arg today "$today" '.translations | map(select(.modified_at | startswith($today))) | sort_by(.modified_at) | reverse | .[] | "- \(.key.key_name.other): \(.translation) (at \(.modified_at))"'
+            
+            echo "---"
           done
 
       - name: Step 4.5 - Debug file structure before pull
