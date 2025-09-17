@@ -1,4 +1,6 @@
 import Section from "@/components/section";
+import Section2 from "@/components/section2";
+import Section3 from "@/components/section3";
 import Image from "next/image";
 
 export default function Page() {
@@ -14,6 +16,8 @@ export default function Page() {
           priority
         />
         <Section />
+        <Section2 />
+        <Section3 />
         <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
           <li className="mb-2 tracking-[-.01em]">
             Get started by editing{" "}

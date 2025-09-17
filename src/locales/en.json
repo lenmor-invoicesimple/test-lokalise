@@ -18,5 +18,7 @@
     "stripe-test": "Stripes",
     "greeting2": "Hello, world again!",
     "welcome2": "Welcome to our site.",
-    "test.key.5": "Another new key"
+    "test.key.5": "Another new key",
+    "title": "Title",
+    "subtitle": "Subtitle"
 }

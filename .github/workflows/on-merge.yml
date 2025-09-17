@@ -1,0 +1,40 @@
+name: Lokalise Sync
+
+on:
+  workflow_dispatch:  # Keep manual trigger
+  push:
+    branches:
+      - main  # Trigger on push to main branch
+  pull_request:
+    types: [closed]
+    branches:
+      - main  # Trigger when PR is merged to main
+  schedule:
+    - cron: "0 2 * * *" # every night
+
+jobs:
+  sync-translations:
+    runs-on: ubuntu-latest
+    # Only run if it's a push to main OR a merged PR (not just closed)
+    if: github.ref == 'refs/heads/main' || (github.event.pull_request.merged == true)
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Lokalise CLI
+        run: curl -sSL https://raw.githubusercontent.com/lokalise/lokalise-cli-2-go/master/install.sh | sh
+
+      - name: Pull from Lokalise
+        run: ./lokalise2 file download \
+          --token ${{ secrets.LOKALISE_API_TOKEN }} \
+          --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
+          --format json \
+          --unzip-to ./locales
+        
+      # - name: Push to Lokalise
+      #   run: ./lokalise2 file upload \
+      #     --token ${{ secrets.LOKALISE_API_TOKEN }} \
+      #     --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
+      #     --file ./locales/en.json \
+      #     --lang-iso en
