@@ -22,7 +22,7 @@ jobs:
     
     env:
       TARGET_LANGUAGES: "es,fr"  # Spanish and French
-      WAIT_TIME_MINUTES: "2"     # 2 minutes wait time
+      WAIT_TIME_MINUTES: "1"     # 2 minutes wait time
     
     steps:
       - name: Checkout Repository
