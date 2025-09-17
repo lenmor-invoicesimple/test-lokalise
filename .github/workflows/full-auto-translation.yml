@@ -1,16 +1,7 @@
 name: Full Auto-Translation Workflow
 
 on:
-  workflow_dispatch:
-    inputs:
-      target_languages:
-        description: 'Languages to translate (comma-separated, e.g. es,fr,de)'
-        required: true
-        default: 'es,fr'
-      wait_time:
-        description: 'Minutes to wait for translation (default: 5)'
-        required: false
-        default: '5'
+  workflow_dispatch:  # Manual trigger (no inputs needed)
   push:
     branches:
       - main  # Auto-trigger when pushing to main
@@ -29,27 +20,15 @@ jobs:
     # Only run if it's a push to main OR a merged PR (not just closed)
     if: github.ref == 'refs/heads/main' || (github.event.pull_request.merged == true)
     
+    env:
+      TARGET_LANGUAGES: "es,fr"  # Spanish and French
+      WAIT_TIME_MINUTES: "5"     # 5 minutes wait time
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set default values for automatic runs
-        id: set-defaults
-        run: |
-          # Use input values if manually triggered, otherwise use defaults
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "target_languages=${{ github.event.inputs.target_languages }}" >> $GITHUB_OUTPUT
-            echo "wait_time=${{ github.event.inputs.wait_time }}" >> $GITHUB_OUTPUT
-          else
-            echo "target_languages=es,fr" >> $GITHUB_OUTPUT
-            echo "wait_time=5" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "Trigger: ${{ github.event_name }}"
-          echo "Languages: $(echo '${{ github.event.inputs.target_languages }}' | sed 's/^$/es,fr/')"
-          echo "Wait time: $(echo '${{ github.event.inputs.wait_time }}' | sed 's/^$/5/') minutes"
 
       - name: Install dependencies
         run: |
@@ -83,25 +62,37 @@ jobs:
           
           # Also check for en-US.json if it exists
           if [ -f "src/locales/en-US.json" ]; then
-            echo "Found en-US.json, uploading to Lokalise..."
+            echo "Found en-US.json, checking if en-US language exists in project..."
             
-            ./bin/lokalise2 file upload \
-              --token ${{ secrets.LOKALISE_API_TOKEN }} \
-              --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
-              --file "src/locales/en-US.json" \
-              --lang-iso en-US \
-              --replace-modified \
-              --include-path \
-              --distinguish-by-file
+            # Check if en-US language exists in project
+            lang_exists=$(curl -s -X GET \
+              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/languages" \
+              -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+              jq -r '.languages[]? | select(.lang_iso == "en-US") | .lang_iso')
             
-            echo "✅ English (US) source file uploaded to Lokalise"
+            if [ "$lang_exists" = "en-US" ]; then
+              echo "en-US language exists, uploading..."
+              ./bin/lokalise2 file upload \
+                --token ${{ secrets.LOKALISE_API_TOKEN }} \
+                --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
+                --file "src/locales/en-US.json" \
+                --lang-iso en-US \
+                --replace-modified \
+                --include-path \
+                --distinguish-by-file
+              echo "✅ English (US) source file uploaded to Lokalise"
+            else
+              echo "⚠️ en-US language not configured in Lokalise project, skipping..."
+              echo "💡 Add en-US as a language in Lokalise if you want to upload this file"
+            fi
           fi
 
       - name: Step 1 - Ensure target languages exist
         run: |
           echo "=== Adding target languages to project ==="
+          echo "Target languages: $TARGET_LANGUAGES"
           
-          IFS=',' read -ra LANGS <<< "${{ steps.set-defaults.outputs.target_languages }}"
+          IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
           
           for lang in "${LANGS[@]}"; do
             echo "Checking/adding language: $lang"
@@ -127,7 +118,7 @@ jobs:
           
           echo "$keys_response" | jq -r '.keys[] | select(.translations[]? | select(.language_iso == "en")) | .key_id' > english_keys.txt
           
-          IFS=',' read -ra LANGS <<< "${{ steps.set-defaults.outputs.target_languages }}"
+          IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
           
           for lang in "${LANGS[@]}"; do
             echo "Creating placeholder translations for $lang"
@@ -157,15 +148,14 @@ jobs:
 
       - name: Step 3 - Wait for Lokalise automation to complete
         run: |
-          wait_minutes=${{ steps.set-defaults.outputs.wait_time }}
-          echo "=== Waiting $wait_minutes minutes for Lokalise automation ==="
-          sleep $((wait_minutes * 60))
+          echo "=== Waiting $WAIT_TIME_MINUTES minutes for Lokalise automation ==="
+          sleep $((WAIT_TIME_MINUTES * 60))
 
       - name: Step 4 - Verify translations were created
         run: |
           echo "=== Checking translation progress ==="
           
-          IFS=',' read -ra LANGS <<< "${{ steps.set-defaults.outputs.target_languages }}"
+          IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
           
           for lang in "${LANGS[@]}"; do
             echo "Checking $lang translations:"
