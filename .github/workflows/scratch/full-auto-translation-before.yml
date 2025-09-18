@@ -30,7 +30,13 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Step 1 - Push source files to Lokalise
+      # --
+      # - name: Install dependencies
+      #   run: |
+      #     sudo apt-get update
+      #     sudo apt-get install -y curl jq
+
+      - name: Step 0 - Push source files to Lokalise
         run: |
           echo "=== Pushing latest source files to Lokalise ==="
           
@@ -83,12 +89,52 @@ jobs:
             fi
           fi
 
-      - name: Step 2 - Wait for Lokalise automation to complete
+      # - name: Step 1 - Ensure target languages exist
+      #   run: |
+      #     echo "=== Adding target languages to project ==="
+      #     echo "Target languages: $TARGET_LANGUAGES"
+          
+      #     IFS=',' read -ra LANGS <<< "$TARGET_LANGUAGES"
+          
+      #     for lang in "${LANGS[@]}"; do
+      #       echo "Checking/adding language: $lang"
+            
+      #       # Add language (will ignore if it already exists)
+      #       response=$(curl -s -X POST \
+      #         "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/languages" \
+      #         -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" \
+      #         -H "Content-Type: application/json" \
+      #         -d "{\"languages\": [{\"lang_iso\": \"$lang\"}]}")
+            
+      #       echo "Response for $lang: $response"
+      #     done
+
+      # - name: Step 2 - Trigger automation via file upload settings
+      #   run: |
+      #     echo "=== Ensuring automation triggers ==="
+          
+      #     # The file upload in Step 0 should have triggered automation automatically
+      #     # with the --use-automations flag (enabled by default)
+          
+      #     # Let's verify automation rules are properly configured
+      #     echo "Checking if automation rules exist..."
+          
+      #     # Get project automations (if API supports it)
+      #     automations=$(curl -s -X GET \
+      #       "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}" \
+      #       -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
+      #       jq -r '.project.name // "Unknown project"')
+          
+      #     echo "Project: $automations"
+      #     echo "✅ File upload with --use-automations should have triggered translation"
+      #     echo "✅ Waiting for Lokalise automation to process uploaded keys..."
+
+      - name: Step 3 - Wait for Lokalise automation to complete
         run: |
           echo "=== Waiting $WAIT_TIME_SECONDS seconds for Lokalise automation ==="
           sleep $((WAIT_TIME_SECONDS))
 
-      - name: Step 3 - Verify translations were created
+      - name: Step 4 - Verify translations were created
         run: |
           echo "=== Checking translation progress ==="
           
@@ -136,7 +182,7 @@ jobs:
             echo "---"
           done
 
-      - name: Step 4 - Debug file structure before pull
+      - name: Step 4.5 - Debug file structure before pull
         run: |
           echo "=== Current file structure ==="
           ls -la src/locales/ || echo "src/locales directory doesn't exist"
@@ -168,7 +214,7 @@ jobs:
           always_pull_base: false
           additional_params: '{"indentation": "4sp", "export_empty_as": "skip", "original_filenames": true}'
 
-      - name: Step 6 - Check what changed after pull
+      - name: Step 5.5 - Check what changed after pull
         run: |
           echo "=== Files after pull ==="
           ls -la src/locales/
@@ -180,7 +226,7 @@ jobs:
           git diff --name-only || echo "No differences found"
           git diff src/locales/ || echo "No changes in src/locales/"
 
-      - name: Step 7 - Summary
+      - name: Step 6 - Summary
         run: |
           echo "=== Workflow Complete ==="
           echo "✅ Target languages added to Lokalise"
