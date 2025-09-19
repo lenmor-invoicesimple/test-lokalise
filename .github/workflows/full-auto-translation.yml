@@ -55,33 +55,6 @@ jobs:
           else
             echo "⚠️ No en.json found in src/locales/"
           fi
-          
-          # Also check for en-US.json if it exists
-          if [ -f "src/locales/en-US.json" ]; then
-            echo "Found en-US.json, checking if en-US language exists in project..."
-            
-            # Check if en-US language exists in project
-            lang_exists=$(curl -s -X GET \
-              "https://api.lokalise.com/api2/projects/${{ secrets.LOKALISE_PROJECT_ID }}/languages" \
-              -H "X-Api-Token: ${{ secrets.LOKALISE_API_TOKEN }}" | \
-              jq -r '.languages[]? | select(.lang_iso == "en-US") | .lang_iso')
-            
-            if [ "$lang_exists" = "en-US" ]; then
-              echo "en-US language exists, uploading..."
-              ./bin/lokalise2 file upload \
-                --token ${{ secrets.LOKALISE_API_TOKEN }} \
-                --project-id ${{ secrets.LOKALISE_PROJECT_ID }} \
-                --file "src/locales/en-US.json" \
-                --lang-iso en-US \
-                --replace-modified \
-                --include-path \
-                --distinguish-by-file
-              echo "✅ English (US) source file uploaded to Lokalise"
-            else
-              echo "⚠️ en-US language not configured in Lokalise project, skipping..."
-              echo "💡 Add en-US as a language in Lokalise if you want to upload this file"
-            fi
-          fi
 
       - name: Step 2 - Wait for Lokalise automation to complete
         run: |
